@@ -2,11 +2,11 @@ package config
 
 import (
 	"errors"
+	"github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs/types"
 	"sort"
 	"time"
 
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/service/cloudwatchlogs"
+	"github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs"
 )
 
 type Configuration struct {
@@ -15,7 +15,7 @@ type Configuration struct {
 	Start      string
 	End        string
 	Filter     string
-	Streams    []*cloudwatchlogs.LogStream
+	Streams    []types.LogStream
 	Descending bool
 	OrderBy    string
 }
@@ -51,22 +51,22 @@ func getTime(timeStr string, currentTime time.Time) (time.Time, error) {
 func (c *Configuration) DescribeLogGroupsInput() *cloudwatchlogs.DescribeLogGroupsInput {
 	input := cloudwatchlogs.DescribeLogGroupsInput{}
 	if c.Prefix != "" {
-		input.SetLogGroupNamePrefix(c.Prefix)
+		input.LogGroupNamePrefix = &c.Prefix
 	}
 	return &input
 }
 
 func (c *Configuration) DescribeLogStreamsInput() *cloudwatchlogs.DescribeLogStreamsInput {
 	input := cloudwatchlogs.DescribeLogStreamsInput{}
-	input.SetLogGroupName(c.Group)
-	input.SetDescending(c.Descending)
+	input.LogGroupName = &c.Group
+	input.Descending = &c.Descending
 
-	if c.OrderBy != "" {
-		input.SetOrderBy(c.OrderBy)
-	}
+	//if c.OrderBy != "" {
+	//	input.OrderBy = &c.OrderBy
+	//}
 
 	if c.Prefix != "" {
-		input.SetLogStreamNamePrefix(c.Prefix)
+		input.LogStreamNamePrefix = &c.Prefix
 	}
 
 	return &input
@@ -74,11 +74,11 @@ func (c *Configuration) DescribeLogStreamsInput() *cloudwatchlogs.DescribeLogStr
 
 func (c *Configuration) FilterLogEventsInput() *cloudwatchlogs.FilterLogEventsInput {
 	input := cloudwatchlogs.FilterLogEventsInput{}
-	input.SetInterleaved(true)
-	input.SetLogGroupName(c.Group)
+	input.LogGroupName = &c.Group
 
 	if len(c.Streams) != 0 {
-		input.SetLogStreamNames(c.TopStreamNames())
+		//names := c.TopStreamNames()
+		//input.LogStreamNames = names
 	}
 
 	currentTime := time.Now()
@@ -89,17 +89,19 @@ func (c *Configuration) FilterLogEventsInput() *cloudwatchlogs.FilterLogEventsIn
 			absoluteStartTime = st
 		}
 	}
-	input.SetStartTime(aws.TimeUnixMilli(absoluteStartTime))
+	start := TimeUnixMilli(absoluteStartTime)
+	input.StartTime = &start
 
 	if c.End != "" {
 		et, err := getTime(c.End, currentTime)
 		if err == nil {
-			input.SetEndTime(aws.TimeUnixMilli(et))
+			end := TimeUnixMilli(et)
+			input.EndTime = &end
 		}
 	}
 
 	if c.Filter != "" {
-		input.SetFilterPattern(c.Filter)
+		input.FilterPattern = &c.Filter
 	}
 
 	return &input
@@ -125,4 +127,8 @@ func (c *Configuration) TopStreamNames() []*string {
 	}
 
 	return streamNames
+}
+
+func TimeUnixMilli(t time.Time) int64 {
+	return t.UnixNano() / int64(time.Millisecond/time.Nanosecond)
 }
